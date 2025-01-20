@@ -1,3 +1,4 @@
+'use client';
 import { CustomerField } from '@/app/lib/definitions';
 import Link from 'next/link';
 import {
@@ -7,10 +8,66 @@ import {
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '@/app/ui/button';
+import { createInvoice, State } from '@/app/lib/actions';
+import { useActionState } from 'react';
+import { useState } from 'react';
 
 export default function Form({ customers }: { customers: CustomerField[] }) {
+  const initialState: State = { message: null, errors: {} };
+  const [state, formAction] = useActionState(createInvoice, initialState);
+
+  // クライアント側検証用のエラーメッセージを保持
+  const [clientErrors, setClientErrors] = useState<string[]>([]);
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); // デフォルトのフォーム送信を防止
+
+    const formData = new FormData(event.currentTarget);
+    const customerId = formData.get('customerId') as string;
+    const amount = parseFloat(formData.get('amount') as string);
+    const status = formData.get('status') as string;
+
+    const errors: string[] = [];
+
+    // クライアント側の検証ロジック
+    if (!customerId) errors.push('Customer ID is required.');
+    if (!amount || amount <= 0) errors.push('Amount must be greater than 0.');
+    if (!status) errors.push('Status is required.');
+
+    if (errors.length > 0) {
+      setClientErrors(errors);
+      return; // 検証失敗時は処理を中断
+    }
+
+    // 検証成功時にフォーム送信を継続
+    setClientErrors([]); // エラーをクリア
+    formAction(formData); // サーバーアクションを呼び出し
+  };
+
   return (
-    <form>
+    <form onSubmit={handleSubmit}>
+      {/* サーバー側エラー表示 */}
+      {state.message && (
+        <div
+          className="mb-4 rounded-lg bg-red-100 p-4 text-red-700"
+          role="alert"
+          aria-live="polite"
+        >
+          {state.message}
+        </div>
+      )}
+
+      {/* クライアント検証エラー表示 */}
+      {clientErrors.length > 0 && (
+        <div className="mb-4 rounded-lg bg-red-100 p-4 text-red-700">
+          <ul>
+            {clientErrors.map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="rounded-md bg-gray-50 p-4 md:p-6">
         {/* Customer Name */}
         <div className="mb-4">
@@ -21,8 +78,9 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
             <select
               id="customer"
               name="customerId"
-              className="peer block w-full cursor-pointer rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
+              className="peer block w-full rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
               defaultValue=""
+              aria-describedby="customer-error"
             >
               <option value="" disabled>
                 Select a customer
@@ -34,6 +92,14 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
               ))}
             </select>
             <UserCircleIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" />
+          </div>
+          <div id="customer-error" aria-live="polite" aria-atomic="true">
+            {state.errors?.customerId &&
+              state.errors.customerId.map((error: string) => (
+                <p className="mt-2 text-sm text-red-500" key={error}>
+                  {error}
+                </p>
+              ))}
           </div>
         </div>
 
@@ -54,6 +120,14 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
               />
               <CurrencyDollarIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
             </div>
+          </div>
+          <div id="amount-error" aria-live="polite" aria-atomic="true">
+            {state.errors?.amount &&
+              state.errors.amount.map((error: string) => (
+                <p className="mt-2 text-sm text-red-500" key={error}>
+                  {error}
+                </p>
+              ))}
           </div>
         </div>
 
@@ -95,6 +169,14 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
                 </label>
               </div>
             </div>
+          </div>
+          <div id="status-error" aria-live="polite" aria-atomic="true">
+            {state.errors?.status &&
+              state.errors.status.map((error: string) => (
+                <p className="mt-2 text-sm text-red-500" key={error}>
+                  {error}
+                </p>
+              ))}
           </div>
         </fieldset>
       </div>
